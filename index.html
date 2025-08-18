@@ -41,7 +41,15 @@
                 <p>Taxi Tickets: <span id="mrx-taxi">4</span></p>
             </div>
         </div>
-        <button id="new-game-btn">New Game</button>
+        <button id="new-local-game-btn">New Local Game</button>
     </div>
+    <div id="multiplayer-controls">
+        <h3>Multiplayer</h3>
+        <button id="host-btn">Host Game</button>
+        <p>Game ID: <span id="game-id"></span></p>
+        <input type="text" id="join-id-input" placeholder="Enter Game ID">
+        <button id="join-btn">Join Game</button>
+    </div>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </body>
 </html>

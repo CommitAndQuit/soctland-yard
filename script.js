@@ -18,6 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Game state
     let gameState = {};
+    let peer;
+    let conn;
+    let isHost = false;
+    let playerRole; // 'detective1' or 'mrX'
 
     // UI Elements
     const detective1Element = document.getElementById('detective-1');
@@ -27,12 +31,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const detectiveTaxiEl = document.getElementById('detective-taxi');
     const mrxTaxiEl = document.getElementById('mrx-taxi');
     const locationElements = document.querySelectorAll('.location');
-    const newGameBtn = document.getElementById('new-game-btn');
+    const newLocalGameBtn = document.getElementById('new-local-game-btn');
+    const hostBtn = document.getElementById('host-btn');
+    const joinBtn = document.getElementById('join-btn');
+    const gameIdDisplay = document.getElementById('game-id');
+    const joinIdInput = document.getElementById('join-id-input');
 
     function handleLocationClick(event) {
         if (gameState.gameover) return;
 
         const locationId = parseInt(event.currentTarget.id.split('-')[1]);
+
+        // In a multiplayer game, only the current player can move
+        if (playerRole !== gameState.currentPlayer) return;
+
         const currentPlayerId = gameState.currentPlayer;
         const currentPlayer = gameState.players[currentPlayerId];
         const currentPos = currentPlayer.position;
@@ -48,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     checkWinCondition();
                     if (gameState.gameover) {
                         updateUI();
+                        sendGameState();
                         return;
                     }
                     gameState.currentPlayer = 'mrX';
@@ -59,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 updateUI();
+                sendGameState();
             } else {
                 alert('Not enough taxi tickets!');
             }
@@ -109,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateUI() {
+        if (!gameState.players) return;
         renderPlayers();
         currentTurnEl.textContent = gameState.turn;
         if (gameState.gameover) {
@@ -120,9 +135,69 @@ document.addEventListener('DOMContentLoaded', () => {
         mrxTaxiEl.textContent = gameState.players.mrX.tickets.taxi;
     }
 
+    function initializePeer() {
+        peer = new Peer();
+
+        peer.on('open', (id) => {
+            if (isHost) {
+                gameIdDisplay.textContent = id;
+            }
+            console.log('My peer ID is: ' + id);
+        });
+
+        peer.on('connection', (connection) => {
+            conn = connection;
+            conn.on('data', (data) => {
+                gameState = data;
+                updateUI();
+            });
+            conn.on('open', () => {
+                console.log("Connection established");
+                sendGameState(); // Send initial game state to the client
+            });
+        });
+
+        peer.on('error', (err) => {
+            alert('An error occurred: ' + err.message);
+            console.error(err);
+        });
+    }
+
+    function sendGameState() {
+        if (conn && conn.open) {
+            conn.send(gameState);
+        }
+    }
+
+    hostBtn.addEventListener('click', () => {
+        isHost = true;
+        playerRole = 'detective1';
+        initializePeer();
+        initGame();
+    });
+
+    joinBtn.addEventListener('click', () => {
+        const joinId = joinIdInput.value;
+        if (joinId) {
+            isHost = false;
+            playerRole = 'mrX';
+            initializePeer();
+            peer.on('open', () => {
+                conn = peer.connect(joinId);
+                conn.on('data', (data) => {
+                    gameState = data;
+                    updateUI();
+                });
+                conn.on('open', () => {
+                    console.log("Connection established with host");
+                });
+            });
+        }
+    });
+
     // Add event listeners
     locationElements.forEach(loc => loc.addEventListener('click', handleLocationClick));
-    newGameBtn.addEventListener('click', initGame);
+    newLocalGameBtn.addEventListener('click', initGame);
 
     initGame();
 });
