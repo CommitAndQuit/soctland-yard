@@ -24,7 +24,7 @@ class Network {
         });
 
         this.peer.on('connection', (conn) => {
-            console.log('A peer wants to connect:', conn.peer);
+            console.log('Incoming connection from:', conn.peer);
             this.setupConnection(conn);
         });
 
@@ -36,17 +36,36 @@ class Network {
 
     createGame() {
         this.isHost = true;
-        this.initialize(this.dataHandler); // Let PeerJS generate an ID
+        this.initialize(this.dataHandler);
+    }
+
+    reinitialize(peerId, hostId = null) {
+        this.isHost = (peerId === hostId);
+        this.initialize(this.dataHandler, peerId);
+
+        if (!this.isHost && hostId) {
+            this.hostId = hostId;
+            this.peer.on('open', () => {
+                this.connectToHost(hostId);
+            });
+        }
+    }
+
+    connectToHost(hostId) {
+        if (this.peer) {
+            console.log(`Peer ${this.myId} attempting to connect to host ${hostId}`);
+            const conn = this.peer.connect(hostId, { metadata: { peerId: this.myId }, reliable: true });
+            this.setupConnection(conn);
+        }
     }
 
     joinGame(hostId) {
         this.isHost = false;
         this.hostId = hostId;
-        this.initialize(this.dataHandler); // Let PeerJS generate an ID for the peer
+        this.initialize(this.dataHandler);
 
         this.peer.on('open', () => {
-            const conn = this.peer.connect(hostId, { metadata: { peerId: this.myId }, reliable: true });
-            this.setupConnection(conn);
+            this.connectToHost(hostId);
         });
     }
 
@@ -54,12 +73,15 @@ class Network {
         conn.on('open', () => {
             console.log(`Connection to ${conn.peer} opened.`);
             this.connections[conn.peer] = conn;
+
             if (this.isHost) {
-                const newPeerId = conn.metadata.peerId;
-                this.playerList.push(newPeerId);
-                const updateMsg = { type: 'PLAYER_LIST_UPDATE', players: this.playerList };
-                this.broadcast(updateMsg);
-                this.dataHandler(updateMsg);
+                // Host logic: a new peer has connected.
+                // Let the main script handle the logic of new vs reconnecting.
+            } else {
+                // Peer logic: we have connected to the host.
+                // Request the game state to join or rejoin the game.
+                console.log(`Peer ${this.myId} sending state request to host.`);
+                conn.send({ type: 'REQUEST_GAME_STATE', peerId: this.myId });
             }
         });
 
@@ -71,13 +93,10 @@ class Network {
 
         conn.on('close', () => {
             console.log(`Connection to ${conn.peer} closed.`);
-            const closedPeerId = conn.metadata.peerId;
             delete this.connections[conn.peer];
             if (this.isHost) {
-                this.playerList = this.playerList.filter(p => p !== closedPeerId);
-                const updateMsg = { type: 'PLAYER_LIST_UPDATE', players: this.playerList };
-                this.broadcast(updateMsg);
-                this.dataHandler(updateMsg);
+                // Let main script handle player drops
+                this.dataHandler({type: 'PEER_DISCONNECTED', peerId: conn.peer });
             }
         });
     }
@@ -86,11 +105,13 @@ class Network {
         const conn = this.connections[peerId];
         if (conn && conn.open) {
             conn.send(data);
+        } else {
+            console.warn(`No open connection to ${peerId} found.`);
         }
     }
 
     broadcast(data) {
-        console.log('Broadcasting:', data, 'to', Object.keys(this.connections));
+        console.log('Broadcasting:', data.type, 'to', Object.keys(this.connections));
         for (const peerId in this.connections) {
             this.sendTo(peerId, data);
         }

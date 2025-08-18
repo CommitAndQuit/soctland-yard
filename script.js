@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const playerList = document.getElementById('player-list');
     const startGameBtn = document.getElementById('start-game-btn');
 
-    // Remove player name input for now to simplify
     document.getElementById('player-name').parentElement.style.display = 'none';
 
     createGameBtn.addEventListener('click', () => {
@@ -41,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isHost) {
             engine = new GameEngine();
             engine.initGame(network.playerList);
+            network.setEngine(engine);
             const gameStateMessage = { type: 'GAME_START', gameState: engine.gameState };
             network.broadcast(gameStateMessage);
             handleIncomingData(gameStateMessage);
@@ -52,12 +52,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function startGameForAll(initialGameState) {
         lobbyContainer.classList.add('hidden');
         gameContainer.classList.remove('hidden');
-        engine = isHost ? engine : { gameState: initialGameState, getValidMoves: () => ({}) }; // Peers have a dummy engine
+        engine = isHost ? engine : { gameState: initialGameState, map: stationData, getValidMoves: () => ({}) };
         myPeerId = network.myId;
         ui = new UI(engine);
         ui.renderBoard();
         ui.update();
         ui.locationElements.forEach(loc => loc.addEventListener('click', handleLocationClick));
+
+        const sessionData = {
+            isHost: isHost,
+            myPeerId: myPeerId,
+            hostId: network.hostId,
+            gameState: isHost ? engine.gameState : null
+        };
+        sessionStorage.setItem('scotlandYardSession', JSON.stringify(sessionData));
     }
 
     function handleLocationClick(event) {
@@ -76,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ticketToUse = ticketToUse.toLowerCase();
             const moveData = { type: 'MAKE_MOVE', payload: { playerId: myPeerId, locationId, ticketToUse } };
             if (isHost) {
-                handleIncomingData(moveData);
+                handleIncomingData(moveData, myPeerId);
             } else {
                 network.sendTo(network.hostId, moveData);
             }
@@ -100,14 +108,34 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'HOST_ID_GENERATED':
                 myPeerId = data.hostId;
                 network.hostId = data.hostId;
-                network.playerList = [myPeerId];
-                gameIdText.textContent = data.hostId;
-                gameIdDisplay.classList.remove('hidden');
-                startGameBtn.classList.remove('hidden');
-                updatePlayerList(network.playerList);
+                if (!engine) {
+                    network.playerList = [myPeerId];
+                    gameIdText.textContent = data.hostId;
+                    gameIdDisplay.classList.remove('hidden');
+                    startGameBtn.classList.remove('hidden');
+                    updatePlayerList(network.playerList);
+                }
+                break;
+            case 'REQUEST_GAME_STATE':
+                if (isHost) {
+                    if (engine && engine.gameState) {
+                        if (engine.gameState.players[data.peerId]) {
+                            network.sendTo(peerId, { type: 'GAME_STATE_UPDATE', gameState: engine.gameState });
+                        }
+                    } else {
+                        if (!network.playerList.includes(data.peerId)) {
+                            network.playerList.push(data.peerId);
+                        }
+                        const updateMessage = { type: 'PLAYER_LIST_UPDATE', players: network.playerList, hostId: network.hostId };
+                        network.broadcast(updateMessage);
+                        handleIncomingData(updateMessage);
+                    }
+                }
                 break;
             case 'PLAYER_LIST_UPDATE':
                 network.playerList = data.players;
+                network.hostId = data.hostId;
+                myPeerId = network.myId;
                 updatePlayerList(data.players);
                 break;
             case 'GAME_START':
@@ -119,15 +147,59 @@ document.addEventListener('DOMContentLoaded', () => {
                     const moveSuccessful = engine.handleMove(playerId, locationId, ticketToUse);
                     if (moveSuccessful) {
                         const updateMessage = { type: 'GAME_STATE_UPDATE', gameState: engine.gameState };
+                        sessionStorage.setItem('scotlandYardSession', JSON.stringify({isHost: true, myPeerId: myPeerId, hostId: network.hostId, gameState: engine.gameState, playerList: network.playerList}));
                         network.broadcast(updateMessage);
                         handleIncomingData(updateMessage);
                     }
                 }
                 break;
             case 'GAME_STATE_UPDATE':
+                if (!engine) {
+                    engine = {};
+                }
                 engine.gameState = data.gameState;
-                ui.update();
+                if (!isHost) {
+                     sessionStorage.setItem('scotlandYardSession', JSON.stringify({isHost: false, myPeerId: myPeerId, hostId: network.hostId}));
+                }
+                if (ui) {
+                    ui.update();
+                } else {
+                    startGameForAll(data.gameState);
+                }
                 break;
+            case 'PEER_DISCONNECTED':
+                 if (isHost) {
+                    network.playerList = network.playerList.filter(p => p !== peerId);
+                    const updateMessage = { type: 'PLAYER_LIST_UPDATE', players: network.playerList, hostId: network.hostId };
+                    network.broadcast(updateMessage);
+                    handleIncomingData(updateMessage);
+                 }
+                 break;
         }
     }
+
+    function checkSession() {
+        const sessionData = JSON.parse(sessionStorage.getItem('scotlandYardSession'));
+        if (!sessionData) return;
+
+        console.log("Found existing session. Re-initializing.", sessionData);
+        isHost = sessionData.isHost;
+        myPeerId = sessionData.myPeerId;
+        network.hostId = sessionData.hostId;
+        createGameBtn.disabled = true;
+        joinGameBtn.disabled = true;
+
+        if (isHost) {
+            engine = new GameEngine();
+            engine.gameState = sessionData.gameState;
+            network.setEngine(engine);
+            network.reinitialize(myPeerId);
+            startGameForAll(sessionData.gameState);
+            updatePlayerList(sessionData.playerList || [myPeerId]);
+        } else {
+            network.reinitialize(myPeerId, sessionData.hostId);
+        }
+    }
+
+    checkSession();
 });
