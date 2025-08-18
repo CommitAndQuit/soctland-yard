@@ -110,3 +110,26 @@
     font-style: italic;
     color: #bbb;
 }
+
+#lobby-container {
+    padding: 20px;
+    border: 1px solid #ccc;
+    margin: 20px;
+    max-width: 500px;
+}
+
+#lobby-container div {
+    margin-bottom: 15px;
+}
+
+#lobby-container input {
+    margin-left: 10px;
+}
+
+#game-container.hidden {
+    display: none;
+}
+
+.hidden {
+    display: none !important;
+}

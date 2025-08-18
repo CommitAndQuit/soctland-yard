@@ -8,33 +8,52 @@
 </head>
 <body>
     <h1>Scotland Yard</h1>
-    <div id="game-board">
-        <svg id="connections" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;">
-        </svg>
-        <div id="stations-container"></div>
-
+    <div id="lobby-container">
+        <h2>Multiplayer Lobby</h2>
+        <div>
+            <label for="player-name">Your Name:</label>
+            <input type="text" id="player-name" placeholder="Enter your name">
+        </div>
+        <hr>
+        <div>
+            <button id="create-game-btn">Create New Game</button>
+        </div>
+        <div id="game-id-display" class="hidden">
+            <p>Share this Game ID with your friends:</p>
+            <strong id="game-id-text"></strong>
+        </div>
+        <hr>
+        <div>
+            <label for="game-id-input">Game ID:</label>
+            <input type="text" id="game-id-input" placeholder="Enter Game ID to join">
+            <button id="join-game-btn">Join Game</button>
+        </div>
+        <div id="player-list-container">
+            <h3>Players in Lobby</h3>
+            <ul id="player-list"></ul>
+            <button id="start-game-btn" class="hidden">Start Game</button>
+        </div>
     </div>
+
+    <div id="game-container" class="hidden">
+        <div id="game-board">
+            <svg id="connections" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;"></svg>
+            <div id="stations-container"></div>
+        </div>
+        <div id="game-info">
+            <h2>Game Info</h2>
+            <p>Current Turn: <span id="current-turn">1</span></p>
+            <p>Current Player: <span id="current-player"></span></p>
+            <div id="player-info-container"></div>
+            <button id="double-move-btn" style="display: none;">Use Double Move</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
     <script src="game-data.js"></script>
     <script src="engine.js"></script>
     <script src="ui.js"></script>
+    <script src="network.js"></script>
     <script src="script.js"></script>
-    <div id="game-info">
-        <h2>Game Info</h2>
-        <p>Current Turn: <span id="current-turn">1</span></p>
-        <p>Current Player: <span id="current-player"></span></p>
-        <div id="player-info-container">
-            <!-- Player info will be generated here -->
-        </div>
-        <button id="new-game-btn">New Game</button>
-        <button id="double-move-btn" style="display: none;">Use Double Move</button>
-    </div>
-    <div id="turn-overlay" class="hidden">
-        <div id="turn-message">
-            <h2 id="overlay-title">Player's Turn</h2>
-            <p>Please pass the device to <strong id="overlay-player-name"></strong>.</p>
-            <p id="overlay-instruction"></p>
-            <button id="ready-btn">I'm Ready</button>
-        </div>
-    </div>
 </body>
 </html>
