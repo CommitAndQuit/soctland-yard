@@ -8,38 +8,44 @@
 </head>
 <body>
     <h1>Scotland Yard</h1>
-    <div id="game-board">
-        <svg id="connections" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;">
-            <line x1="120" y1="120" x2="220" y2="70" stroke="orange" stroke-width="2"/>
-            <line x1="120" y1="120" x2="170" y2="220" stroke="orange" stroke-width="2"/>
-            <line x1="220" y1="70" x2="320" y2="120" stroke="orange" stroke-width="2"/>
-            <line x1="220" y1="70" x2="170" y2="220" stroke="orange" stroke-width="2"/>
-            <line x1="320" y1="120" x2="270" y2="220" stroke="orange" stroke-width="2"/>
-            <line x1="170" y1="220" x2="270" y2="220" stroke="orange" stroke-width="2"/>
-        </svg>
-        <div class="location" id="loc-1" style="top: 100px; left: 100px;">1</div>
-        <div class="location" id="loc-2" style="top: 50px; left: 200px;">2</div>
-        <div class="location" id="loc-3" style="top: 100px; left: 300px;">3</div>
-        <div class="location" id="loc-4" style="top: 200px; left: 150px;">4</div>
-        <div class="location" id="loc-5" style="top: 200px; left: 250px;">5</div>
-
-        <div class="player detective" id="detective-1"></div>
-        <div class="player mr-x" id="mr-x"></div>
+    <div id="lobby-container">
+        <h2>Multiplayer Lobby</h2>
+        <div>
+            <label for="player-name">Your Name:</label>
+            <input type="text" id="player-name" placeholder="Enter your name">
+        </div>
+        <hr>
+        <div>
+            <button id="create-game-btn">Create New Game</button>
+        </div>
+        <div id="game-id-display" class="hidden">
+            <p>Share this Game ID with your friends:</p>
+            <strong id="game-id-text"></strong>
+        </div>
+        <hr>
+        <div>
+            <label for="game-id-input">Game ID:</label>
+            <input type="text" id="game-id-input" placeholder="Enter Game ID to join">
+            <button id="join-game-btn">Join Game</button>
+        </div>
+        <div id="player-list-container">
+            <h3>Players in Lobby</h3>
+            <ul id="player-list"></ul>
+            <button id="start-game-btn" class="hidden">Start Game</button>
+        </div>
     </div>
-    <script src="script.js"></script>
-    <div id="game-info">
-        <h2>Game Info</h2>
-        <p>Current Turn: <span id="current-turn">1</span></p>
-        <p>Current Player: <span id="current-player">Detective</span></p>
-        <div id="player-info">
-            <div id="detective-info">
-                <h3>Detective</h3>
-                <p>Taxi Tickets: <span id="detective-taxi">10</span></p>
-            </div>
-            <div id="mrx-info">
-                <h3>Mr. X</h3>
-                <p>Taxi Tickets: <span id="mrx-taxi">4</span></p>
-            </div>
+
+    <div id="game-container" class="hidden">
+        <div id="game-board">
+            <svg id="connections" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;"></svg>
+            <div id="stations-container"></div>
+        </div>
+        <div id="game-info">
+            <h2>Game Info</h2>
+            <p>Current Turn: <span id="current-turn">1</span></p>
+            <p>Current Player: <span id="current-player"></span></p>
+            <div id="player-info-container"></div>
+            <button id="double-move-btn" style="display: none;">Use Double Move</button>
         </div>
         <button id="new-local-game-btn">New Local Game</button>
     </div>
@@ -51,5 +57,14 @@
         <button id="join-btn">Join Game</button>
     </div>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
+    <script src="game-data.js"></script>
+    <script src="engine.js"></script>
+    <script src="ui.js"></script>
+    <script src="network.js"></script>
+    <script src="script.js"></script>
+
 </body>
 </html>

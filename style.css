@@ -1,10 +1,11 @@
 #game-board {
     position: relative;
-    width: 450px;
-    height: 350px;
+    width: 1650px;
+    height: 1250px;
     border: 2px solid black;
     background-color: #f0f0f0;
     margin: 20px;
+    transform-origin: top left;
 }
 
 .location {
@@ -61,4 +62,80 @@
     margin-top: 10px;
     padding: 10px;
     border: 1px solid #ccc;
+}
+.player-info-card {
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.player-info-card.active {
+    border-color: #000;
+    font-weight: bold;
+}
+
+#player-info-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.location.valid-move {
+    box-shadow: 0 0 10px 5px #0ff;
+    cursor: pointer;
+}
+
+#turn-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    text-align: center;
+}
+
+#turn-overlay.hidden {
+    display: none;
+}
+
+#turn-message {
+    padding: 40px;
+    background: #222;
+    border: 2px solid #555;
+    border-radius: 10px;
+}
+
+#overlay-instruction {
+    margin-top: 20px;
+    font-style: italic;
+    color: #bbb;
+}
+
+#lobby-container {
+    padding: 20px;
+    border: 1px solid #ccc;
+    margin: 20px;
+    max-width: 500px;
+}
+
+#lobby-container div {
+    margin-bottom: 15px;
+}
+
+#lobby-container input {
+    margin-left: 10px;
+}
+
+#game-container.hidden {
+    display: none;
+}
+
+.hidden {
+    display: none !important;
+
 }
