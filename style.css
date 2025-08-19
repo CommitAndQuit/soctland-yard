@@ -1,0 +1,20 @@
+body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#game-container {
+    display: flex;
+    flex-direction: row;
+}
+
+#game-board {
+    border: 1px solid black;
+}
+
+#ui-sidebar {
+    padding-left: 20px;
+    width: 200px;
+}
