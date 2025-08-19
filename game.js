@@ -1,13 +1,116 @@
 console.log("game.js loaded");
 
-// --- GLOBAL VARIABLES for turn logic ---
+// --- CONSTANTS ---
+const MAX_ROUNDS = 24;
+
+// --- GLOBAL VARIABLES ---
 let validMoves = [];
 
 // --- UI ELEMENTS ---
-let turnIndicator, confirmMoveBtn, mrXLog;
+let turnIndicator, confirmMoveBtn, mrXLog, gameOverScreen, gameOverMessage;
 
 // --- GAME LOGIC ---
 
+function endGame(message) {
+    if (gameState.isGameOver) return; // Prevent multiple endings
+
+    console.log("Game Over:", message);
+    gameState.isGameOver = true;
+
+    if (gameOverScreen && gameOverMessage) {
+        gameOverMessage.textContent = message;
+        gameOverScreen.style.display = 'flex';
+    }
+
+    if (playerRole === 'host') {
+        broadcastGameState(); // Send final state
+    }
+}
+
+function checkWinConditions() {
+    if (gameState.isGameOver) return;
+
+    const mrX = gameState.players.find(p => p.role === 'Mr. X');
+    const detectives = gameState.players.filter(p => p.role === 'Detective');
+
+    // 1. Detectives win by catching Mr. X
+    for (const detective of detectives) {
+        if (detective.currentPosition === mrX.currentPosition) {
+            endGame("Detectives Win! Mr. X has been caught.");
+            return;
+        }
+    }
+
+    // 2. Mr. X wins by surviving all rounds
+    if (gameState.round > MAX_ROUNDS) {
+        endGame("Mr. X Wins! He has escaped.");
+        return;
+    }
+
+    // 3. Mr. X wins if all detectives are stranded
+    const canAnyDetectiveMove = detectives.some(d => getValidMoves(d).length > 0);
+    if (!canAnyDetectiveMove) {
+        endGame("Mr. X Wins! The detectives are stranded.");
+        return;
+    }
+}
+
+function confirmMove() {
+    // ... (rest of the function is the same, but with checks for isGameOver)
+    if (gameState.isGameOver) {
+        console.warn("Attempted to move after game over.");
+        return;
+    }
+
+    const selectedId = gameState.selectedStationId;
+    if (selectedId === null) { return; }
+
+    if (playerRole === 'host') {
+        const player = gameState.players[gameState.currentTurnPlayerIndex];
+        const startStation = getStationById(player.currentPosition);
+        const transport = getTransportForMove(startStation, selectedId, player);
+
+        if (!transport) { return; }
+
+        player.tickets[transport]--;
+        player.currentPosition = selectedId;
+        if (player.role === 'Mr. X') {
+            gameState.mrXHistory.push(transport);
+        }
+
+        advanceTurn();
+        broadcastGameState();
+
+    } else if (playerRole === 'peer') {
+        sendMoveToHost({ stationId: selectedId });
+        confirmMoveBtn.disabled = true;
+    }
+}
+
+function advanceTurn() {
+    // Host-only function
+    if (gameState.isGameOver) return;
+
+    gameState.currentTurnPlayerIndex++;
+    const numPlayers = gameState.players.length;
+    if (gameState.currentTurnPlayerIndex >= numPlayers) {
+        gameState.round++;
+        gameState.currentTurnPlayerIndex = 0;
+    }
+
+    // Check for win conditions after state has been updated
+    checkWinConditions();
+    updateUIFromGameState();
+}
+
+// --- UI AND STATE SYNC ---
+
+function updateMrXLog() { /* ... same as before ... */ }
+function getValidMoves(player) { /* ... same as before ... */ }
+function handleStationClick(stationId) { /* ... same as before ... */ }
+function getTransportForMove(startStation, endStationId, player) { /* ... same as before ... */ }
+
+// Re-pasting for completeness
 function updateMrXLog() {
     if (!mrXLog) return;
     mrXLog.innerHTML = '';
@@ -22,7 +125,6 @@ function updateMrXLog() {
         mrXLog.appendChild(logEntry);
     });
 }
-
 function getValidMoves(player) {
     const moves = [];
     const currentStation = getStationById(player.currentPosition);
@@ -35,19 +137,12 @@ function getValidMoves(player) {
     }
     return [...new Set(moves)];
 }
-
 function handleStationClick(stationId) {
-    // Only the current player on their machine can select a move
-    // TODO: Add check to see if it's this client's player's turn
-    if (!validMoves.includes(stationId)) {
-        console.warn("Clicked on an invalid station:", stationId);
-        return;
-    }
+    if (gameState.isGameOver || !validMoves.includes(stationId)) return;
     gameState.selectedStationId = stationId;
     selectStationHighlight(stationId);
     confirmMoveBtn.disabled = false;
 }
-
 function getTransportForMove(startStation, endStationId, player) {
     const transportPriority = ['taxi', 'bus', 'underground'];
     for (const transport of transportPriority) {
@@ -58,73 +153,30 @@ function getTransportForMove(startStation, endStationId, player) {
     return null;
 }
 
-function confirmMove() {
-    const selectedId = gameState.selectedStationId;
-    if (selectedId === null) {
-        console.error("Confirm move called with no selected station.");
+function updateUIFromGameState() {
+    if (gameState.isGameOver) {
+        // Find winner message if not already displayed
+        const mrX = gameState.players.find(p => p.role === 'Mr. X');
+        const detectives = gameState.players.filter(p => p.role === 'Detective');
+        let winnerMsg = '';
+        const detectiveAtMrX = detectives.find(d => d.currentPosition === mrX.currentPosition);
+        if (detectiveAtMrX) winnerMsg = "Detectives Win!";
+        else if (gameState.round > MAX_ROUNDS) winnerMsg = "Mr. X Wins!";
+
+        if(gameOverScreen.style.display === 'none' && winnerMsg) {
+             endGame(winnerMsg);
+        }
         return;
     }
 
-    if (playerRole === 'host') {
-        const player = gameState.players[gameState.currentTurnPlayerIndex];
-        const startStation = getStationById(player.currentPosition);
-        const transport = getTransportForMove(startStation, selectedId, player);
-
-        if (!transport) {
-            console.error("Host validation failed for a move.");
-            return;
-        }
-
-        // --- Update Game State ---
-        player.tickets[transport]--;
-        player.currentPosition = selectedId;
-        if (player.role === 'Mr. X') {
-            gameState.mrXHistory.push(transport);
-        }
-
-        console.log(`${player.id} moved to station ${selectedId} via ${transport}.`);
-
-        // --- Advance turn and broadcast ---
-        advanceTurn(); // This will update the UI locally for the host
-        broadcastGameState(); // And send the new state to all peers
-
-    } else if (playerRole === 'peer') {
-        // Peers don't update state directly. They send their move to the host.
-        console.log(`Peer sending move to station ${selectedId} to host.`);
-        sendMoveToHost({ stationId: selectedId });
-        // The peer's UI will be updated when it receives the new game state from the host.
-        // Disable the button to prevent multiple submissions
-        confirmMoveBtn.disabled = true;
-    }
-}
-
-function advanceTurn() {
-    gameState.currentTurnPlayerIndex++;
-    const numPlayers = gameState.players.length;
-    if (gameState.currentTurnPlayerIndex >= numPlayers) {
-        gameState.round++;
-        gameState.currentTurnPlayerIndex = 0;
-    }
-    updateUIFromGameState();
-}
-
-// Centralized UI update function
-function updateUIFromGameState() {
-    console.log("Updating UI from game state");
-
-    // Reset highlights and selections
     gameState.selectedStationId = null;
     validMoves = [];
     resetStationHighlights();
     if (confirmMoveBtn) confirmMoveBtn.disabled = true;
 
-    // Redraw player markers
     drawPlayerMarkers();
-
-    // Update Mr. X log
     updateMrXLog();
 
-    // Update turn indicator
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
     if (turnIndicator) {
         turnIndicator.textContent = `Turn: ${currentPlayer.role} (${currentPlayer.id})`;
@@ -134,12 +186,9 @@ function updateUIFromGameState() {
         turnIndicator.style.borderRadius = '5px';
     }
 
-    // Determine and highlight valid moves for the current player on this client
-    // TODO: This should only happen if the current turn belongs to this client
     validMoves = getValidMoves(currentPlayer);
     highlightValidMoves(validMoves);
 }
-
 
 function startGame() {
     console.log("Game starting...");
@@ -151,9 +200,10 @@ document.addEventListener('DOMContentLoaded', () => {
     turnIndicator = document.getElementById('turn-indicator');
     confirmMoveBtn = document.getElementById('confirm-move-btn');
     mrXLog = document.getElementById('mr-x-log');
+    gameOverScreen = document.getElementById('game-over-screen');
+    gameOverMessage = document.getElementById('game-over-message');
 
     if (confirmMoveBtn) {
         confirmMoveBtn.addEventListener('click', confirmMove);
     }
-    // startGame() is now called from network.js after the board and connection are ready.
 });

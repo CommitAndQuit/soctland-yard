@@ -17,9 +17,16 @@
             <input type="text" id="room-code-input" placeholder="Enter Room Code">
             <button id="join-game-btn">Join Game</button>
         </div>
-        <div id="room-info" style="display: none;">
+        <div id="host-lobby" style="display: none;">
             <p>Share this room code with other players:</p>
             <strong id="room-code-display"></strong>
+            <div id="lobby-container">
+                <h3>Lobby</h3>
+                <div id="player-list">
+                    <!-- Player entries will be added here dynamically -->
+                </div>
+                <button id="start-game-btn">Start Game</button>
+            </div>
         </div>
     </div>
 
@@ -42,5 +49,10 @@
     <script src="board.js"></script>
     <script src="game.js"></script>
     <script src="network.js"></script>
+
+    <div id="game-over-screen" style="display: none;">
+        <div id="game-over-message"></div>
+        <button id="play-again-btn" onclick="window.location.reload()">Play Again</button>
+    </div>
 </body>
 </html>
