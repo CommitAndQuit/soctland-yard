@@ -18,3 +18,23 @@ body {
     padding-left: 20px;
     width: 200px;
 }
+
+.station-circle {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.station-circle:hover {
+    opacity: 0.7;
+}
+
+.station-circle.valid-move {
+    stroke: #00c4ff; /* Bright blue */
+    stroke-width: 4;
+}
+
+.station-circle.selected-move {
+    stroke: #ffdd00; /* Gold */
+    stroke-width: 5;
+    fill: #ffdd00;
+}
