@@ -5,6 +5,35 @@ body {
     align-items: center;
 }
 
+#start-screen {
+    text-align: center;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    margin-top: 20px;
+}
+
+#start-screen .start-options button,
+#start-screen .start-options input {
+    padding: 10px;
+    margin: 5px;
+    font-size: 16px;
+    width: 200px;
+}
+
+#room-info {
+    margin-top: 20px;
+}
+
+#room-code-display {
+    background-color: #eee;
+    padding: 10px;
+    border-radius: 5px;
+    font-family: monospace;
+    font-size: 1.2em;
+}
+
+
 #game-container {
     display: flex;
     flex-direction: row;
