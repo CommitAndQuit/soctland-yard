@@ -1,10 +1,8 @@
 console.log("network.js loaded");
 
 // --- Constants ---
-const SIGNALING_SERVER_URL = 'ws://localhost:8080';
-const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 const PLAYER_ROLES = ['Mr. X', 'Detective Blue', 'Detective Green', 'Detective Red', 'Detective Yellow'];
-const STARTING_POSITIONS = { /* Pre-defined starting locations */
+const STARTING_POSITIONS = {
     'Mr. X': [35, 51, 67, 103, 142],
     'Detective': [13, 29, 53, 91, 138, 155, 174, 198]
 };
@@ -15,41 +13,58 @@ const TICKET_ALLOCATIONS = {
 
 // --- Global Variables ---
 let playerRole = null;
-let peers = new Map();
-let hostConnection = null;
-let myPeerId = null; // The ID assigned by the signaling server
+let peer = null;
+let myPeerId = null;
+let connections = new Map();
 
-// --- Signaling Client ---
-// ... (The signaling object is unchanged, so I will omit it for brevity but it's still here)
-const signaling = { ws: null, onMessageCallback: null, connect: function() { /* ... */ }, send: function(message) { /* ... */ }, setOnMessageCallback: function(callback) { /* ... */ }};
-signaling.connect = function() { return new Promise((resolve, reject) => { if (this.ws && this.ws.readyState === WebSocket.OPEN) { resolve(); return; } this.ws = new WebSocket(SIGNALING_SERVER_URL); this.ws.onopen = () => { console.log("Connected to signaling server."); resolve(); }; this.ws.onmessage = (event) => { try { const message = JSON.parse(event.data); if (this.onMessageCallback) this.onMessageCallback(message); } catch (e) { console.error("Failed to parse message", e); } }; this.ws.onclose = () => { console.log("Disconnected from signaling server."); this.ws = null; }; this.ws.onerror = (error) => { console.error("Signaling error:", error); reject(error); }; }); };
-signaling.send = function(message) { if (this.ws && this.ws.readyState === WebSocket.OPEN) { this.ws.send(JSON.stringify(message)); } else { console.error("WebSocket is not open."); } };
-signaling.setOnMessageCallback = function(callback) { this.onMessageCallback = callback; };
+// --- Data Synchronization ---
+function broadcastGameState() {
+    if (playerRole !== 'host') return;
+    const message = { type: 'game-state-update', payload: gameState };
+    console.log("Host broadcasting state:", message);
+    for (const conn of connections.values()) {
+        conn.send(message);
+    }
+}
 
+function sendMoveToHost(move) {
+    if (playerRole !== 'peer') return;
+    const hostConn = connections.values().next().value;
+    if (hostConn) {
+        const message = { type: 'player-move', payload: move };
+        console.log("Peer sending move:", message);
+        hostConn.send(message);
+    }
+}
 
-// --- Data Channel Communication ---
-function broadcastGameState() { /* ... same as before ... */ }
-function sendMoveToHost(move) { /* ... same as before ... */ }
-function handleHostDataChannelMessage(event, peerId) { /* ... same as before ... */ }
-function handlePeerDataChannelMessage(event) { /* ... same as before ... */ }
-// Re-pasting for completeness
-function broadcastGameState() { if (playerRole !== 'host') return; const message = JSON.stringify({ type: 'game-state-update', payload: gameState }); for (const peer of peers.values()) { if (peer.dataChannel && peer.dataChannel.readyState === 'open') { peer.dataChannel.send(message); } } }
-function sendMoveToHost(move) { if (playerRole !== 'peer' || !hostConnection?.dataChannel) return; const message = JSON.stringify({ type: 'player-move', payload: move }); hostConnection.dataChannel.send(message); }
-function handleHostDataChannelMessage(event, peerId) { const message = JSON.parse(event.data); if (message.type === 'player-move') { confirmMove(message.payload.stationId); } }
-function handlePeerDataChannelMessage(event) { const message = JSON.parse(event.data); if (message.type === 'game-state-update') { Object.assign(gameState, message.payload); updateUIFromGameState(); } }
+function handleHostData(data, peerId) {
+    if (data.type === 'player-move') {
+        const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+        if (currentPlayer.id === peerId) {
+            console.log(`Host processing valid move from ${peerId}`);
+            confirmMove(data.payload.stationId);
+        } else {
+            console.warn(`Host received move from ${peerId}, but it is ${currentPlayer.id}'s turn.`);
+        }
+    }
+}
 
+function handlePeerData(data) {
+    if (data.type === 'game-state-update') {
+        console.log("Peer received new game state.");
+        Object.assign(gameState, data.payload);
+        updateUIFromGameState();
+    }
+}
 
 // --- LOBBY AND ROLE ASSIGNMENT ---
-
 function updateLobbyUI() {
     const playerListDiv = document.getElementById('player-list');
     playerListDiv.innerHTML = '';
-
     const createPlayerRow = (id, isHost = false) => {
         const row = document.createElement('div');
         const select = document.createElement('select');
         select.dataset.playerId = id;
-
         PLAYER_ROLES.forEach(role => {
             const option = document.createElement('option');
             option.value = role;
@@ -60,9 +75,8 @@ function updateLobbyUI() {
         row.appendChild(select);
         playerListDiv.appendChild(row);
     };
-
     if (myPeerId) createPlayerRow(myPeerId, true);
-    for (const peerId of peers.keys()) {
+    for (const peerId of connections.keys()) {
         createPlayerRow(peerId, false);
     }
 }
@@ -76,156 +90,63 @@ function buildGameStateFromLobby() {
     for (const select of playerElements) {
         const playerId = select.dataset.playerId;
         const role = select.value;
-
-        if (assignedRoles.has(role)) {
-            alert(`Role "${role}" has been assigned more than once!`);
-            return null;
-        }
+        if (assignedRoles.has(role)) { alert(`Role "${role}" assigned twice!`); return null; }
         if (role === 'Mr. X') mrXCount++;
-
         assignedRoles.add(role);
-
         const isMrX = role === 'Mr. X';
         const tickets = isMrX ? TICKET_ALLOCATIONS['Mr. X'] : TICKET_ALLOCATIONS['Detective'];
-        const startPos = isMrX
-            ? STARTING_POSITIONS['Mr. X'][Math.floor(Math.random() * STARTING_POSITIONS['Mr. X'].length)]
-            : STARTING_POSITIONS['Detective'][Math.floor(Math.random() * STARTING_POSITIONS['Detective'].length)];
-
-        newPlayers.push({
-            id: playerId,
-            role: role,
-            isMrX: isMrX,
-            currentPosition: startPos,
-            tickets: { ...tickets },
-            color: role.split(' ')[1]?.toLowerCase() || 'black'
-        });
+        const startPos = isMrX ? STARTING_POSITIONS['Mr. X'][Math.floor(Math.random() * STARTING_POSITIONS['Mr. X'].length)] : STARTING_POSITIONS['Detective'][Math.floor(Math.random() * STARTING_POSITIONS['Detective'].length)];
+        newPlayers.push({ id: playerId, role: role, isMrX: isMrX, currentPosition: startPos, tickets: { ...tickets }, color: role.split(' ')[1]?.toLowerCase() || 'black' });
     }
-
-    if (mrXCount !== 1) {
-        alert('Exactly one player must be assigned the role of Mr. X.');
-        return null;
-    }
-
-    // Sort players so Mr. X is last for turn order
+    if (mrXCount !== 1) { alert('Exactly one player must be Mr. X.'); return null; }
     newPlayers.sort((a, b) => a.isMrX - b.isMrX);
-
     gameState.players = newPlayers;
     return true;
 }
 
-
-// --- WebRTC Host Logic ---
-
-function createPeerConnection(peerId) {
-    console.log(`Creating peer connection for peer: ${peerId}`);
-    const peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-
-    peerConnection.onicecandidate = (event) => {
-        if (event.candidate) signaling.send({ type: 'ice-candidate', target: peerId, payload: event.candidate });
-    };
-
-    peerConnection.oniceconnectionstatechange = () => {
-        if (['disconnected', 'failed', 'closed'].includes(peerConnection.iceConnectionState)) {
-            console.log(`Peer ${peerId} has disconnected.`);
-            peers.delete(peerId);
-            updateLobbyUI(); // Update lobby if game hasn't started
-            endGame(`Player ${peerId} disconnected. Game over.`);
-        }
-    };
-
-    const dataChannel = peerConnection.createDataChannel('game-data');
-    dataChannel.onopen = () => { console.log(`Data channel with ${peerId} is open.`); };
-    dataChannel.onmessage = (event) => handleHostDataChannelMessage(event, peerId);
-
-    peers.set(peerId, { peerConnection, dataChannel });
-
-    peerConnection.createOffer()
-        .then(offer => peerConnection.setLocalDescription(offer))
-        .then(() => {
-            signaling.send({ type: 'offer', target: peerId, payload: peerConnection.localDescription });
-        })
-        .catch(e => console.error("Error creating offer:", e));
-}
-function handleHostMessages(message) {
-    const { type, peerId, payload } = message;
-    switch (type) {
-        case 'my-id-is': myPeerId = peerId; break; // Server tells us our own ID
-        case 'room-created':
-            document.getElementById('room-code-display').textContent = payload.roomCode;
-            document.getElementById('host-lobby').style.display = 'block';
-            document.querySelector('.start-options').style.display = 'none';
-            updateLobbyUI();
-            break;
-        case 'peer-joined':
-            createPeerConnection(peerId);
-            updateLobbyUI();
-            break;
-        case 'answer': peers.get(peerId)?.peerConnection.setRemoteDescription(new RTCSessionDescription(payload)); break;
-        case 'ice-candidate': peers.get(peerId)?.peerConnection.addIceCandidate(new RTCIceCandidate(payload)); break;
-    }
-}
-async function hostGame() {
+// --- PeerJS Host Logic ---
+function hostGame() {
     playerRole = 'host';
-    try {
-        await signaling.connect();
-        signaling.setOnMessageCallback(handleHostMessages);
-        signaling.send({ type: 'create-room' });
-    } catch (error) { alert("Failed to connect to signaling server."); }
+    peer = new Peer();
+    peer.on('open', (id) => {
+        myPeerId = id;
+        document.getElementById('room-code-display').textContent = id;
+        document.getElementById('host-lobby').style.display = 'block';
+        document.querySelector('.start-options').style.display = 'none';
+        updateLobbyUI();
+    });
+    peer.on('connection', (conn) => {
+        console.log(`Peer ${conn.peer} has connected.`);
+        connections.set(conn.peer, conn);
+        updateLobbyUI();
+        conn.on('data', (data) => handleHostData(data, conn.peer));
+        conn.on('close', () => {
+            connections.delete(conn.peer);
+            updateLobbyUI();
+            endGame(`Player ${conn.peer} disconnected. Game over.`);
+        });
+    });
+    peer.on('error', (err) => { alert(`An error occurred: ${err.message}`); });
 }
-// Re-pasting createPeerConnection for completeness
-function createPeerConnection(peerId) { const peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS }); peerConnection.onicecandidate = (event) => { if (event.candidate) signaling.send({ type: 'ice-candidate', target: peerId, payload: event.candidate }); }; const dataChannel = peerConnection.createDataChannel('game-data'); dataChannel.onopen = () => { console.log(`Data channel with ${peerId} is open.`); }; dataChannel.onmessage = (event) => handleHostDataChannelMessage(event, peerId); peers.set(peerId, { peerConnection, dataChannel }); peerConnection.createOffer().then(offer => peerConnection.setLocalDescription(offer)).then(() => { signaling.send({ type: 'offer', target: peerId, payload: peerConnection.localDescription }); }).catch(e => console.error("Error creating offer:", e)); }
 
-
-// --- WebRTC Peer Logic ---
-function handlePeerMessages(message) { /* ... same as before ... */ }
-async function joinGame(roomCode) { /* ... same as before ... */ }
-// Re-pasting for completeness
-function handlePeerMessages(message) {
-    const { type, from, payload } = message;
-    switch (type) {
-        case 'offer':
-            const hostId = from;
-            const offer = payload;
-            const peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-            hostConnection = { peerConnection, dataChannel: null };
-
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) signaling.send({ type: 'ice-candidate', target: hostId, payload: event.candidate });
-            };
-
-            peerConnection.oniceconnectionstatechange = () => {
-                if (['disconnected', 'failed', 'closed'].includes(peerConnection.iceConnectionState)) {
-                    console.log("Disconnected from host.");
-                    endGame("Connection to host lost. Game over.");
-                }
-            };
-
-            peerConnection.ondatachannel = (event) => {
-                hostConnection.dataChannel = event.channel;
-                hostConnection.dataChannel.onopen = () => {
-                    console.log("Data channel with host is open.");
-                };
-                hostConnection.dataChannel.onmessage = handlePeerDataChannelMessage;
-            };
-
-            peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
-                .then(() => peerConnection.createAnswer())
-                .then(answer => peerConnection.setLocalDescription(answer))
-                .then(() => {
-                    signaling.send({ type: 'answer', target: hostId, payload: peerConnection.localDescription });
-                })
-                .catch(e => console.error("Error handling offer:", e));
-            break;
-        case 'ice-candidate':
-            if (hostConnection?.peerConnection) hostConnection.peerConnection.addIceCandidate(new RTCIceCandidate(payload));
-            break;
-        case 'room-not-found':
-            alert("Error: Room not found.");
-            break;
-    }
+// --- PeerJS Peer Logic ---
+function joinGame(hostId) {
+    playerRole = 'peer';
+    peer = new Peer();
+    peer.on('open', (id) => {
+        myPeerId = id;
+        const conn = peer.connect(hostId);
+        connections.set(hostId, conn);
+        conn.on('open', () => {
+            console.log("Connection to host established.");
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('game-container').style.display = 'flex';
+        });
+        conn.on('data', handlePeerData);
+        conn.on('close', () => { endGame("Disconnected from host. Game over."); });
+    });
+    peer.on('error', (err) => { alert(`An error occurred: ${err.message}`); });
 }
-async function joinGame(roomCode) { playerRole = 'peer'; try { await signaling.connect(); signaling.setOnMessageCallback(handlePeerMessages); signaling.send({ type: 'join-room', payload: { roomCode } }); } catch (error) { alert("Failed to connect to signaling server."); } }
-
 
 // --- UI Initialization ---
 document.addEventListener('DOMContentLoaded', () => {

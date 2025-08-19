@@ -12,8 +12,7 @@ let turnIndicator, confirmMoveBtn, mrXLog, gameOverScreen, gameOverMessage;
 // --- GAME LOGIC ---
 
 function endGame(message) {
-    if (gameState.isGameOver) return; // Prevent multiple endings
-
+    if (gameState.isGameOver) return;
     console.log("Game Over:", message);
     gameState.isGameOver = true;
 
@@ -23,17 +22,16 @@ function endGame(message) {
     }
 
     if (playerRole === 'host') {
-        broadcastGameState(); // Send final state
+        broadcastGameState();
     }
 }
 
 function checkWinConditions() {
     if (gameState.isGameOver) return;
-
     const mrX = gameState.players.find(p => p.role === 'Mr. X');
-    const detectives = gameState.players.filter(p => p.role === 'Detective');
+    if (!mrX) return; // Game hasn't started or Mr. X is missing
+    const detectives = gameState.players.filter(p => p.role !== 'Mr. X');
 
-    // 1. Detectives win by catching Mr. X
     for (const detective of detectives) {
         if (detective.currentPosition === mrX.currentPosition) {
             endGame("Detectives Win! Mr. X has been caught.");
@@ -41,40 +39,32 @@ function checkWinConditions() {
         }
     }
 
-    // 2. Mr. X wins by surviving all rounds
     if (gameState.round > MAX_ROUNDS) {
         endGame("Mr. X Wins! He has escaped.");
         return;
     }
 
-    // 3. Mr. X wins if all detectives are stranded
     const canAnyDetectiveMove = detectives.some(d => getValidMoves(d).length > 0);
-    if (!canAnyDetectiveMove) {
+    if (detectives.length > 0 && !canAnyDetectiveMove) {
         endGame("Mr. X Wins! The detectives are stranded.");
         return;
     }
 }
 
 function confirmMove() {
-    // ... (rest of the function is the same, but with checks for isGameOver)
-    if (gameState.isGameOver) {
-        console.warn("Attempted to move after game over.");
-        return;
-    }
-
+    if (gameState.isGameOver) return;
     const selectedId = gameState.selectedStationId;
-    if (selectedId === null) { return; }
+    if (selectedId === null) return;
 
     if (playerRole === 'host') {
         const player = gameState.players[gameState.currentTurnPlayerIndex];
         const startStation = getStationById(player.currentPosition);
         const transport = getTransportForMove(startStation, selectedId, player);
-
-        if (!transport) { return; }
+        if (!transport) return;
 
         player.tickets[transport]--;
         player.currentPosition = selectedId;
-        if (player.role === 'Mr. X') {
+        if (player.isMrX) {
             gameState.mrXHistory.push(transport);
         }
 
@@ -88,29 +78,16 @@ function confirmMove() {
 }
 
 function advanceTurn() {
-    // Host-only function
     if (gameState.isGameOver) return;
-
     gameState.currentTurnPlayerIndex++;
-    const numPlayers = gameState.players.length;
-    if (gameState.currentTurnPlayerIndex >= numPlayers) {
+    if (gameState.currentTurnPlayerIndex >= gameState.players.length) {
         gameState.round++;
         gameState.currentTurnPlayerIndex = 0;
     }
-
-    // Check for win conditions after state has been updated
     checkWinConditions();
     updateUIFromGameState();
 }
 
-// --- UI AND STATE SYNC ---
-
-function updateMrXLog() { /* ... same as before ... */ }
-function getValidMoves(player) { /* ... same as before ... */ }
-function handleStationClick(stationId) { /* ... same as before ... */ }
-function getTransportForMove(startStation, endStationId, player) { /* ... same as before ... */ }
-
-// Re-pasting for completeness
 function updateMrXLog() {
     if (!mrXLog) return;
     mrXLog.innerHTML = '';
@@ -125,10 +102,12 @@ function updateMrXLog() {
         mrXLog.appendChild(logEntry);
     });
 }
+
 function getValidMoves(player) {
     const moves = [];
+    if (!player) return moves;
     const currentStation = getStationById(player.currentPosition);
-    if (!currentStation || !currentStation.connections) return [];
+    if (!currentStation || !currentStation.connections) return moves;
     for (const transport in player.tickets) {
         if (player.tickets[transport] > 0) {
             const destinations = currentStation.connections[transport] || [];
@@ -137,12 +116,15 @@ function getValidMoves(player) {
     }
     return [...new Set(moves)];
 }
+
 function handleStationClick(stationId) {
     if (gameState.isGameOver || !validMoves.includes(stationId)) return;
+    // TODO: Add check to only allow moves for this client's player
     gameState.selectedStationId = stationId;
     selectStationHighlight(stationId);
     confirmMoveBtn.disabled = false;
 }
+
 function getTransportForMove(startStation, endStationId, player) {
     const transportPriority = ['taxi', 'bus', 'underground'];
     for (const transport of transportPriority) {
@@ -155,19 +137,13 @@ function getTransportForMove(startStation, endStationId, player) {
 
 function updateUIFromGameState() {
     if (gameState.isGameOver) {
-        // Find winner message if not already displayed
-        const mrX = gameState.players.find(p => p.role === 'Mr. X');
-        const detectives = gameState.players.filter(p => p.role === 'Detective');
-        let winnerMsg = '';
-        const detectiveAtMrX = detectives.find(d => d.currentPosition === mrX.currentPosition);
-        if (detectiveAtMrX) winnerMsg = "Detectives Win!";
-        else if (gameState.round > MAX_ROUNDS) winnerMsg = "Mr. X Wins!";
-
-        if(gameOverScreen.style.display === 'none' && winnerMsg) {
-             endGame(winnerMsg);
+        if (gameOverScreen.style.display === 'none' && gameState.winnerMessage) {
+            endGame(gameState.winnerMessage);
         }
         return;
     }
+
+    if (!gameState.players || gameState.players.length === 0) return;
 
     gameState.selectedStationId = null;
     validMoves = [];
@@ -178,7 +154,7 @@ function updateUIFromGameState() {
     updateMrXLog();
 
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
-    if (turnIndicator) {
+    if (turnIndicator && currentPlayer) {
         turnIndicator.textContent = `Turn: ${currentPlayer.role} (${currentPlayer.id})`;
         turnIndicator.style.color = 'white';
         turnIndicator.style.backgroundColor = currentPlayer.color;
@@ -186,6 +162,7 @@ function updateUIFromGameState() {
         turnIndicator.style.borderRadius = '5px';
     }
 
+    // TODO: Only calculate and highlight moves if it's this client's turn
     validMoves = getValidMoves(currentPlayer);
     highlightValidMoves(validMoves);
 }
