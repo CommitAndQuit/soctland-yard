@@ -7,7 +7,7 @@ const STARTING_POSITIONS = {
     'Detective': [13, 29, 53, 91, 138, 155, 174, 198]
 };
 const TICKET_ALLOCATIONS = {
-    'Mr. X': { taxi: 24, bus: 24, underground: 24 },
+    'Mr. X': { taxi: 24, bus: 24, underground: 24, black: 5, double: 2 },
     'Detective': { taxi: 10, bus: 8, underground: 4 }
 };
 
@@ -41,8 +41,9 @@ function handleHostData(data, peerId) {
     if (data.type === 'player-move') {
         const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
         if (currentPlayer.id === peerId) {
-            console.log(`Host processing valid move from ${peerId}`);
-            confirmMove(data.payload.stationId);
+            console.log(`Host processing valid move from ${peerId}:`, data.payload);
+            // The host calls confirmMove with the data received from the peer
+            confirmMove(data.payload);
         } else {
             console.warn(`Host received move from ${peerId}, but it is ${currentPlayer.id}'s turn.`);
         }

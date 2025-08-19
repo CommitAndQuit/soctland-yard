@@ -4,13 +4,6 @@ const board = document.getElementById('game-board');
 const SVG_NS = "http://www.w3.org/2000/svg";
 let stations = [];
 
-const transportColors = {
-    taxi: 'yellow',
-    bus: 'green',
-    underground: 'red',
-    ferry: 'blue'
-};
-
 // Create groups for organization
 const connectionsGroup = document.createElementNS(SVG_NS, 'g');
 const stationsGroup = document.createElementNS(SVG_NS, 'g');

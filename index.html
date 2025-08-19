@@ -34,9 +34,15 @@
         <svg id="game-board" width="800" height="600"></svg>
         <div id="ui-sidebar">
             <h2>Game Info</h2>
-            <div id="player-info"></div>
+            <div id="player-info">
+                <div id="player-tickets"></div>
+            </div>
             <div id="turn-indicator"></div>
             <div id="action-buttons">
+                <div id="special-moves" style="display: none;">
+                    <button id="double-move-btn">Use Double Move</button>
+                    <button id="black-ticket-btn">Use Black Ticket</button>
+                </div>
                 <button id="confirm-move-btn" disabled>Confirm Move</button>
             </div>
             <div id="mrx-info">

@@ -1,5 +1,13 @@
 console.log("state.js loaded");
 
+const transportColors = {
+    taxi: 'yellow',
+    bus: 'green',
+    underground: 'red',
+    ferry: 'blue',
+    black: 'black'
+};
+
 const gameState = {
     isGameOver: false,
     winnerMessage: null,
