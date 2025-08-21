@@ -1,0 +1,131 @@
+body {
+  font-family: sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+  background-color: #333;
+}
+
+#app-container {
+    width: 1000px;
+    height: 1000px;
+    position: relative;
+    background-image: url('https://i.imgur.com/8i2s5z1.png');
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+#game-board {
+  position: relative;
+}
+
+#map {
+  background-color: transparent; /* Make canvas see-through */
+}
+
+#token-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1000px;
+    height: 1000px;
+    pointer-events: none;
+}
+
+.token {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 5px black;
+    transform: translate(-50%, -50%);
+    transition: top 0.5s ease-in-out, left 0.5s ease-in-out;
+}
+
+#token-1 { background-color: black; }
+#token-2 { background-color: red; }
+#token-3 { background-color: blue; }
+#token-4 { background-color: yellowgreen; }
+
+
+#ui-panel {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 10px;
+  border: 1px solid #ccc;
+  z-index: 10;
+  border-radius: 5px;
+}
+
+.hidden {
+  display: none;
+}
+
+#move-log {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 10px;
+    border: 1px solid #ccc;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10;
+    border-radius: 5px;
+}
+
+#game-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 15px;
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+#player-names {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#player-names input {
+  padding: 8px;
+  font-size: 16px;
+  width: 250px;
+}
+
+#game-over-modal, #pass-device-modal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 30px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+#restart-game, #player-ready-btn {
+  padding: 10px 20px;
+  font-size: 18px;
+  cursor: pointer;
+  margin-top: 20px;
+}

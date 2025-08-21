@@ -1,0 +1,45 @@
+<body>
+<div id="app-container">
+  <div id="game-setup">
+    <h2>Enter Player Names</h2>
+    <div id="player-names">
+      <input type="text" id="player1-name" placeholder="Player 1 (Mr. X)">
+      <input type="text" id="player2-name" placeholder="Player 2 (Detective)">
+      <input type="text" id="player3-name" placeholder="Player 3 (Detective)">
+      <input type="text" id="player4-name" placeholder="Player 4 (Detective)">
+    </div>
+    <div>
+      <input type="checkbox" id="debug-mode">
+      <label for="debug-mode">Show Mr. X's location (Debug Mode)</label>
+    </div>
+    <button id="start-game">Start New Game</button>
+  </div>
+
+  <div id="game-board" class="hidden">
+    <canvas id="map" width="1000" height="1000"></canvas>
+    <div id="token-container"></div>
+    <div id="ui-panel">
+      <p id="turn-indicator">Player 1’s Turn</p>
+      <div id="tickets"></div>
+      <div id="special-moves"></div>
+    </div>
+    <div id="move-log"></div>
+  </div>
+
+    <div id="game-over-modal" class="hidden">
+      <div class="modal-content">
+        <h2 id="game-over-message"></h2>
+        <button id="restart-game">Restart Game</button>
+      </div>
+    </div>
+
+    <div id="pass-device-modal" class="hidden">
+      <div class="modal-content">
+        <h2 id="pass-device-message"></h2>
+        <button id="player-ready-btn">I'm Ready</button>
+      </div>
+    </div>
+  </div>
+  <script src="stations.js"></script>
+  <script src="game.js"></script>
+</body>
